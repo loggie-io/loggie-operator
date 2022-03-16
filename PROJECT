@@ -1,0 +1,16 @@
+domain: loggie.io
+layout:
+- go.kubebuilder.io/v3
+projectName: loggie-operator
+repo: loggie.io/loggie
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: loggie.io
+  group: operator
+  kind: LogCluster
+  path: loggie.io/loggie/api/v1beta1
+  version: v1beta1
+version: "3"

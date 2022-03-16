@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Name }}
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  ownerReferences:
+  - apiVersion: operator.loggie.io/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: LogCluster
+    name: {{ .Name }}
+    uid: {{ .UID }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Name }}
+    spec:
+      containers:
+      - args:
+        - -meta.nodeName=$(NODE_NAME)
+        - -config.system=/etc/loggie.yaml
+        - -config.pipeline=/etc/loggie/pipelines/*.yaml
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        image: {{ .Spec.Image }}
+        name: loggie
+        resources:
+          limits:
+            cpu: {{ .Spec.Resources.Limits.Cpu }}
+            memory: {{ .Spec.Resources.Limits.Memory }}
+          requests:
+            cpu: {{ .Spec.Resources.Requests.Cpu }}
+            memory: {{ .Spec.Resources.Requests.Memory }}
+        volumeMounts:
+        - mountPath: /etc/loggie.yaml
+          name: config
+          subPath: loggie.yaml
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        {{- range $key, $val := .Spec.NodeSelector}}
+        {{ $key }}: {{ $val }}
+        {{- end }}
+
+      volumes:
+      - configMap:
+          defaultMode: 384
+          name: {{ .Name }}-config
+        name: config

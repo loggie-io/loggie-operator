@@ -1,0 +1,22 @@
+apiVersion: operator.loggie.io/v1beta1
+kind: LogCluster
+metadata:
+  name: logcluster-sample
+  namespace: loggie
+spec:
+  image: hub.c.163.com/qingzhou/loggie:feat-prometheus-exporter-5aa6a6dea-arm64
+  # Deaemonset/Deployment, default DaemonSet
+  type: DaemonSet
+  volumes:
+    pipelineConfigDir: /etc/loggie/pipelines
+    kubeletRootDir: /var/lib/kubelet
+    dockerRootDir: /var/lib/docker
+    hostPaths:
+      - /data
+  resources:
+    limits:
+      cpu: "16"
+      memory: 10000Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
