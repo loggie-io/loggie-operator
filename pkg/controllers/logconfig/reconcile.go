@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	AnnotationAutoCreateKey = "loggie.io/create"
+	AnnotationAutoCreateKey               = "loggie.io/create"
 	AnnotationCreateSidecarConfigMapValue = "configmap"
 
 	AutoCreateConfigMapData = "pipelines.yml"
@@ -131,10 +131,10 @@ func (r *Reconciler) lgc2cm(ctx context.Context, lgc *logconfigv1beta1.LogConfig
 
 	var pipelines []ConfigRaw
 	pipe := ConfigRaw{
-		Name:    lgc.Name,
-		Sources: src,
+		Name:         lgc.Name,
+		Sources:      src,
 		Interceptors: interceptor,
-		Sink: sink,
+		Sink:         sink,
 	}
 	pipelines = append(pipelines, pipe)
 	pipelineConfig.Pipelines = pipelines
