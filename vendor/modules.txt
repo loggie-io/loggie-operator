@@ -60,7 +60,7 @@ github.com/hashicorp/golang-lru/simplelru
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.11
 github.com/json-iterator/go
-# github.com/loggie-io/loggie v0.0.0-20220114032955-c58e9545bf01
+# github.com/loggie-io/loggie v1.0.0
 ## explicit
 github.com/loggie-io/loggie/pkg/core/log
 github.com/loggie-io/loggie/pkg/core/log/spi
