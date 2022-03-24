@@ -2,8 +2,10 @@ package logconfig
 
 import (
 	"context"
+	"fmt"
 	"github.com/loggie-io/loggie/pkg/core/log"
 	logconfigv1beta1 "github.com/loggie-io/loggie/pkg/discovery/kubernetes/apis/loggie/v1beta1"
+	"github.com/loggie-io/operator/pkg/constant"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -11,13 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	AnnotationAutoCreateKey               = "loggie.io/create"
-	AnnotationCreateSidecarConfigMapValue = "configmap"
-
-	AutoCreateConfigMapData = "pipelines.yml"
 )
 
 type Reconciler struct {
@@ -70,7 +65,7 @@ type ConfigRaw struct {
 }
 
 func (r *Reconciler) createSidecarConfigMap(ctx context.Context, lgc *logconfigv1beta1.LogConfig, req ctrl.Request) error {
-	if lgc.Annotations[AnnotationAutoCreateKey] != AnnotationCreateSidecarConfigMapValue {
+	if lgc.Annotations[constant.AnnotationAutoCreateKey] != constant.AnnotationCreateSidecarConfigMapValue {
 		return nil
 	}
 
@@ -142,6 +137,15 @@ func (r *Reconciler) lgc2cm(ctx context.Context, lgc *logconfigv1beta1.LogConfig
 	cm := &corev1.ConfigMap{}
 	cm.Name = lgc.Name
 	cm.Namespace = lgc.Namespace
+	cm.Labels = map[string]string{
+		constant.LoggieOperatorLabel: lgc.Name,
+	}
+	if lgc.Spec.Selector.Type == "pod" && lgc.Spec.Selector.PodSelector.LabelSelector != nil {
+		for k, v := range lgc.Spec.Selector.PodSelector.LabelSelector {
+			cm.Labels[fmt.Sprintf("%s-%s", constant.LoggieOperatorLabel, k)] = v
+		}
+
+	}
 
 	out, err := yaml.Marshal(pipelineConfig)
 	if err != nil {
@@ -150,7 +154,7 @@ func (r *Reconciler) lgc2cm(ctx context.Context, lgc *logconfigv1beta1.LogConfig
 	}
 
 	data := make(map[string]string)
-	data[AutoCreateConfigMapData] = string(out)
+	data[constant.AutoCreateConfigMapData] = string(out)
 	cm.Data = data
 
 	return cm, nil
