@@ -21,11 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	LogClusterTypeDaemonSet  = "DaemonSet"
-	LogClusterTypeDeployment = "Deployment"
-)
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -35,12 +30,14 @@ type LogClusterSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of LogCluster. Edit logcluster_types.go to remove/update
-	Image        string                  `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
+	// +kubebuilder:validation:Enum=DaemonSet;Deployment;SideCar
 	Type         string                  `json:"type,omitempty"`
 	Replicas     int                     `json:"replicas,omitempty"` // only type=Deployment
 	Resources    v1.ResourceRequirements `json:"resources,omitempty"`
 	NodeSelector map[string]string       `json:"nodeSelector,omitempty"`
 	Volumes      Volumes                 `json:"volumes"`
+	SystemConfig string                  `json:"systemConfig,omitempty"` // only type=SideCar
 }
 
 type Volumes struct {

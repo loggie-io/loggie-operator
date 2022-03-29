@@ -55,18 +55,8 @@ func (r *PodInject) Handle(ctx context.Context, req admission.Request) admission
 	}
 	if err := r.List(ctx, &lcs); err == nil {
 		for _, lc := range lcs.Items {
-			if lc.Spec.Type != "SideCar" {
+			if lc.Spec.Type != constant.LogClusterTypeSideCar {
 				continue
-			}
-			// Gets a ConfigMap with the same prefix name as LogCluster
-			systemCmName := fmt.Sprintf("%s-system", lc.Name)
-			systemCm := corev1.ConfigMap{}
-			if err := r.Get(ctx, client.ObjectKey{Namespace: getNameSpaceEev(), Name: systemCmName}, &systemCm); err != nil {
-				return admission.Errored(http.StatusBadRequest, fmt.Errorf("ConfigMap %s  not found", systemCmName))
-			}
-			sysCfg, ok := systemCm.Data[constant.AutoCreateSystemConfigMapData]
-			if !ok {
-				return admission.Errored(http.StatusBadRequest, fmt.Errorf("loggie system config %s  not found in  %s", constant.AutoCreateSystemConfigMapData, systemCmName))
 			}
 			pipeCms := corev1.ConfigMapList{}
 			// Gets a ConfigMap with the same name as LogCluster
@@ -85,7 +75,7 @@ func (r *PodInject) Handle(ctx context.Context, req admission.Request) admission
 					loggieContainer.Image = constant.LoggieAgentImageName
 					loggieContainer.Env = append(loggieContainer.Env, corev1.EnvVar{
 						Name:  constant.AutoCreateSystemConfigMapData,
-						Value: sysCfg,
+						Value: lc.Spec.SystemConfig,
 					})
 					loggieContainer.Env = append(loggieContainer.Env, corev1.EnvVar{
 						Name:  constant.AutoCreateConfigMapData,
