@@ -22,6 +22,7 @@ import (
 	"github.com/loggie-io/operator/pkg/controllers/logcluster"
 	"github.com/loggie-io/operator/pkg/controllers/logconfig"
 	"github.com/loggie-io/operator/pkg/controllers/templ"
+	"github.com/loggie-io/operator/pkg/webhooks"
 	"path"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -108,7 +109,7 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		log.Fatal("unable to create logConfig controller: %v", err)
 	}
-
+	webhooks.SetupWithWebhook(mgr)
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		log.Fatal("unable to set up health check: %v", err)
 	}

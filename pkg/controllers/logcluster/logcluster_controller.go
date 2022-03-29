@@ -19,8 +19,11 @@ package logcluster
 import (
 	"context"
 	"encoding/json"
+	"github.com/loggie-io/loggie/pkg/core/cfg"
 	"github.com/loggie-io/loggie/pkg/core/log"
+	"github.com/loggie-io/loggie/pkg/core/sysconfig"
 	"github.com/loggie-io/operator/pkg/api/v1beta1"
+	"github.com/loggie-io/operator/pkg/constant"
 	templ2 "github.com/loggie-io/operator/pkg/controllers/templ"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,10 +70,14 @@ func (r *LogClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// create or update DaemonSet/Deployment
-	if lc.Spec.Type == v1beta1.LogClusterTypeDaemonSet {
-		return r.createOrUpdateDaemonSet(ctx, req, lc)
-	} else if lc.Spec.Type == v1beta1.LogClusterTypeDeployment {
+	switch lc.Spec.Type {
+	case constant.LogClusterTypeDeployment:
 		return r.createOrUpdateDeployment(ctx, req, lc)
+	case constant.LogClusterTypeDaemonSet:
+		return r.createOrUpdateDaemonSet(ctx, req, lc)
+	case constant.LogClusterTypeSideCar:
+		// validate loggie system config
+		return ctrl.Result{}, cfg.UnpackRawDefaultsAndValidate([]byte(lc.Spec.SystemConfig), &sysconfig.Config{})
 	}
 
 	return ctrl.Result{}, nil
