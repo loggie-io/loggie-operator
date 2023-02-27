@@ -1,0 +1,28 @@
+sidecar:
+  enabled: true
+  image: loggieio/loggie:main
+  systemConfig: |
+    loggie:
+      reload:
+        enabled: true
+        period: 10s
+
+      monitor:
+        logger:
+          period: 30s
+          enabled: true
+        listeners:
+          filesource: ~
+          reload: ~
+          sink: ~
+          queue: ~
+
+      defaults:
+        sink:
+          type: dev
+          printEvents: true
+          codec:
+            type: json
+            pretty: true
+      http:
+        enabled: true

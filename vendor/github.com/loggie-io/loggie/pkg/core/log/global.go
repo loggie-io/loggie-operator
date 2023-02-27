@@ -19,11 +19,12 @@ package log
 import (
 	"flag"
 	"fmt"
-	"github.com/rs/zerolog"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
 	"path"
+
+	"github.com/rs/zerolog"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/loggie-io/loggie/pkg/core/log/spi"
 )
@@ -36,7 +37,7 @@ var (
 
 func init() {
 	flag.StringVar(&gLoggerConfig.Level, "log.level", "info", "Global log output level")
-	flag.BoolVar(&gLoggerConfig.JsonFormat, "log.jsonFormat", true, "Parses the JSON log format")
+	flag.BoolVar(&gLoggerConfig.JsonFormat, "log.jsonFormat", false, "Parses the JSON log format")
 	flag.BoolVar(&gLoggerConfig.EnableStdout, "log.enableStdout", true, "EnableStdout enable the log print to stdout")
 	flag.BoolVar(&gLoggerConfig.EnableFile, "log.enableFile", false, "EnableFile makes the framework log to a file")
 	flag.StringVar(&gLoggerConfig.Directory, "log.directory", "/var/log", "Directory to log to to when log.enableFile is enabled")
@@ -45,19 +46,23 @@ func init() {
 	flag.IntVar(&gLoggerConfig.MaxBackups, "log.maxBackups", 3, "Max number of rolled files to keep")
 	flag.IntVar(&gLoggerConfig.MaxAge, "log.maxAge", 7, "Max age in days to keep a logfile")
 	flag.StringVar(&gLoggerConfig.TimeFormat, "log.timeFormat", "2006-01-02 15:04:05", "TimeFormat log time format")
+	flag.IntVar(&gLoggerConfig.CallerSkipCount, "log.callerSkipCount", 4, "CallerSkipCount is the number of stack frames to skip to find the caller")
+	flag.BoolVar(&gLoggerConfig.NoColor, "log.noColor", false, "NoColor disables the colorized output")
 }
 
 type LoggerConfig struct {
-	Level        string `yaml:"level,omitempty"`
-	JsonFormat   bool   `yaml:"jsonFormat,omitempty"`
-	EnableStdout bool   `yaml:"enableStdout,omitempty"`
-	EnableFile   bool   `yaml:"enableFile,omitempty"`
-	Directory    string `yaml:"directory,omitempty"`
-	Filename     string `yaml:"filename,omitempty"`
-	MaxSize      int    `yaml:"maxSize,omitempty"`
-	MaxBackups   int    `yaml:"maxBackups,omitempty"`
-	MaxAge       int    `yaml:"maxAge,omitempty"`
-	TimeFormat   string `yaml:"timeFormat,omitempty"`
+	Level           string `yaml:"level,omitempty"`
+	JsonFormat      bool   `yaml:"jsonFormat,omitempty"`
+	EnableStdout    bool   `yaml:"enableStdout,omitempty"`
+	EnableFile      bool   `yaml:"enableFile,omitempty"`
+	Directory       string `yaml:"directory,omitempty"`
+	Filename        string `yaml:"filename,omitempty"`
+	MaxSize         int    `yaml:"maxSize,omitempty"`
+	MaxBackups      int    `yaml:"maxBackups,omitempty"`
+	MaxAge          int    `yaml:"maxAge,omitempty"`
+	TimeFormat      string `yaml:"timeFormat,omitempty"`
+	CallerSkipCount int    `yaml:"callerSkipCount,omitempty"`
+	NoColor         bool   `yaml:"noColor,omitempty"`
 }
 
 type Logger struct {
@@ -73,23 +78,27 @@ func NewLogger(config *LoggerConfig) *Logger {
 	var writers []io.Writer
 
 	if config.EnableStdout {
-		if config.JsonFormat {
-			writers = append(writers, os.Stderr)
-		} else {
-			writers = append(writers, zerolog.ConsoleWriter{
-				Out:        os.Stderr,
-				TimeFormat: config.TimeFormat,
-			})
-		}
+		writers = append(writers, os.Stderr)
 	}
 
 	if config.EnableFile {
 		writers = append(writers, newRollingFile(config.Directory, config.Filename, config.MaxBackups, config.MaxSize, config.MaxAge))
 	}
 
+	if !config.JsonFormat {
+		for i, w := range writers {
+			writers[i] = zerolog.ConsoleWriter{
+				Out:        w,
+				NoColor:    config.NoColor,
+				TimeFormat: config.TimeFormat,
+			}
+		}
+	}
+
 	mw := io.MultiWriter(writers...)
 
-	zerolog.CallerSkipFrameCount = 4
+	zerolog.TimeFieldFormat = config.TimeFormat
+	zerolog.CallerSkipFrameCount = config.CallerSkipCount
 	level, err := zerolog.ParseLevel(config.Level)
 	if err != nil {
 		panic("set log level error, choose trace/debug/info/warn/error/fatal/panic")
@@ -162,12 +171,20 @@ func (logger *Logger) Fatal(format string, a ...interface{}) {
 	}
 }
 
+func (logger *Logger) GetLevel() string {
+	return logger.l.GetLevel().String()
+}
+
 func (logger *Logger) RawJson(key string, raw []byte, format string, a ...interface{}) {
 	if a == nil {
 		logger.l.Log().RawJSON(key, raw).Msg(format)
 	} else {
 		logger.l.Log().RawJSON(key, raw).Msgf(format, a...)
 	}
+}
+
+func IsDebugLevel() bool {
+	return defaultLogger.GetLevel() == zerolog.DebugLevel.String()
 }
 
 func Debug(format string, a ...interface{}) {
