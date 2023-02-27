@@ -18,11 +18,10 @@ package main
 
 import (
 	"flag"
-	"github.com/loggie-io/operator/pkg/api/v1beta1"
-	"github.com/loggie-io/operator/pkg/controllers/logcluster"
-	"github.com/loggie-io/operator/pkg/controllers/logconfig"
-	"github.com/loggie-io/operator/pkg/controllers/templ"
-	"path"
+	"github.com/loggie-io/loggie/pkg/core/cfg"
+	"github.com/loggie-io/operator/pkg/config"
+	"github.com/loggie-io/operator/pkg/webhook"
+	runtimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -44,23 +43,25 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(logconfigv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
+	var port int
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	var templPath string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	var certDir string
+	var configPath string
+	flag.IntVar(&port, "port", 9443, "Loggie Operator server port.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":9296", "The address the metric endpoint binds to.")
+	flag.StringVar(&certDir, "cert-dir", "/tmp/cert", "cert-dir is the directory that contains the server key and certificate.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":9297", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&templPath, "template-path", "config/template", "The path where template files")
+	flag.StringVar(&configPath, "config-path", "config.yml", "Global Configuration path.")
 	flag.Parse()
 
 	log.InitDefaultLogger()
@@ -68,7 +69,8 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		CertDir:                certDir,
+		Port:                   port,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "5a8e7206.loggie.io",
@@ -76,37 +78,30 @@ func main() {
 	if err != nil {
 		log.Fatal("unable to start manager: %v", err)
 	}
-	dsTemplPath := path.Join(templPath, "loggie-daemonset.tmpl")
-	dstp, err := templ.NewTemplate(dsTemplPath)
-	if err != nil {
-		log.Fatal("unable to new template: %v", err)
-	}
-	deployTemplPath := path.Join(templPath, "loggie-deployment.tmpl")
-	dptp, err := templ.NewTemplate(deployTemplPath)
-	if err != nil {
-		log.Fatal("unable to new template: %v", err)
-	}
-	cmTemplPath := path.Join(templPath, "loggie-configmap.tmpl")
-	cmtp, err := templ.NewTemplate(cmTemplPath)
-	if err != nil {
-		log.Fatal("unable to new template: %v", err)
+
+	// read configuration
+	conf := config.Config{}
+	unpack := cfg.UnPackFromFile(configPath, &conf)
+	if err := unpack.Defaults().Validate().Do(); err != nil {
+		log.Fatal("invalid config: %v, \n%s", err, unpack.Contents())
 	}
 
-	if err = (&logcluster.LogClusterReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		DaemonsetTempl:  dstp,
-		DeploymentTempl: dptp,
-		ConfigMapTempl:  cmtp,
-	}).SetupWithManager(mgr); err != nil {
-		log.Fatal("unable to create logCluster controller: %v", err)
-	}
+	// TODO
+	//if err = (&logconfig.Reconciler{
+	//	Config: &conf,
+	//	Client: mgr.GetClient(),
+	//	Scheme: mgr.GetScheme(),
+	//}).SetupWithManager(mgr); err != nil {
+	//	log.Fatal("unable to create LogConfig controller: %v", err)
+	//}
 
-	if err = (&logconfig.Reconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		log.Fatal("unable to create logConfig controller: %v", err)
+	if conf.Sidecar.Enabled {
+		log.Info("sidecar injector is enabled")
+		hookServer := mgr.GetWebhookServer()
+		hookServer.Register("/mutate-inject-sidecar", &runtimeWebhook.Admission{Handler: &webhook.SidecarInjection{
+			Client: mgr.GetClient(),
+			Config: conf.Sidecar,
+		}})
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
