@@ -27,6 +27,11 @@ Loggie operator为Loggie的一个可选择补充可扩展组件，目前的主�
 
 3. 运行：`make run`
 
+### Kubernetes
+
+1. 下载operator helm chart: `https://github.com/loggie-io/installation/tree/main/operator-helm-chart`
+
+2. 执行`helm -nloggie install loggie-operator ./operator-helm-chart`
 
 ## 使用
 
